@@ -1,0 +1,1289 @@
+---
+title: "Single Cell Analysis Pipeline"
+author: "Ziyu Zeng"
+date: "2022-09-15"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+# General Information
+
+## File Structure
+
+-   Data/
+    -   Dataset_1(Standard_format)/
+        -   barcodes.tsv
+        -   genes.tsv
+        -   matrix.mtx
+    -   Dataset_2(H5_format)/
+        -   data.h5
+    -   Dataset_3(Text_format)/
+        -   data.txt
+-   Scripts/ *(Current directory)*
+    -   Script.R
+    -   Pipeline.rmd
+-   Output/
+    -   Dataset_1/
+        -   Output files
+    -   Dataset_2/
+    -   ...
+
+## Data Description
+
+Below is a summary of data downloaded so far.
+
+| Author                                                                                                                | Year | Species      | Pathology          | GEO Accession Number                                                                                                                                                                  | Format                        | Additional Notes                                                                  | Analyzed? |
+|---------|---------|---------|---------|---------|---------|---------|---------|
+| [Crowley et al](https://elifesciences.org/articles/59465).                                                            | 2020 | Human, Mouse | Normal             | GSE150692                                                                                                                                                                             | .txt count matrices           | 3 human samples, 6 mouse samples (2 whole + 1 for each lobe)                      | N         |
+| [Joseph et al.](https://onlinelibrary.wiley.com/doi/10.1002/pros.24020)                                               | 2020 | Human        | Normal             | GSE145843                                                                                                                                                                             | .h5 hierarchical matrices     | 6 samples(3 peripheral zones, 3 transition zones + urethra)                       | N         |
+| [Joseph et al.](https://onlinelibrary.wiley.com/doi/10.1002/pros.24020)                                               | 2020 | Human        | BPH                | GSE145838                                                                                                                                                                             | .h5 hierarchical matrices     | 3 samples (BPH glandular, peripheral zone)                                        | N         |
+| [Joseph et al.](https://onlinelibrary.wiley.com/doi/10.1002/path.5751)                                                | 2021 | Mouse        | Normal             | GSE172352                                                                                                                                                                             | .h5 hierarchical matrices     | 4 samples(AP+LP+DLP), St= CD326-, col_GEX = collagenase                           | Y         |
+| [Joseph et al.](https://onlinelibrary.wiley.com/doi/10.1002/path.5751)                                                | 2021 | Human        | BPH                | GSE172301                                                                                                                                                                             | .h5 hierarchical matrices     | 13 samples                                                                        | N         |
+| [Karthaus et al.](DOI:%2010.1126/science.aay0267)                                                                     | 2020 | Mouse        | Normal             | GSE146811(raw) ;[SCP859](https://singlecell.broadinstitute.org/single_cell/study/SCP864/regenerative-potential-of-prostate-luminal-cells-revealed-by-single-cell-analysis-human)      | .h5                           | raw: 1 pooled file of 27 samples (7 intact, 8 castrated, 12 DHT pellet implanted) | N         |
+| [Karthaus et al.](DOI:%2010.1126/science.aay0267)                                                                     | 2020 | Human        | Cancer             | N/A; [SCP864](https://singlecell.broadinstitute.org/single_cell/study/SCP859/regenerative-potential-of-prostate-luminal-cells-revealed-by-single-cell-analysis-mouse)                 | standard 3-file               | N=8 (4 intact, 4 ADT treated)                                                     | N         |
+| [Song et al.](https://www.nature.com/articles/s41467-021-27322-4)                                                     | 2022 | Human        | Cancer (primary)   | GSE176031                                                                                                                                                                             | .txt count matrices           | N=11, split into 53 samples (10 biopsy, 25 radical prostatectomy, 18 organoids)   | Y         |
+| [Henry et al.](https://www.cell.com/cell-reports/fulltext/S2211-1247(18)31877-1)                                      | 2018 | Human        | Normal             | GSE117403                                                                                                                                                                             | standard 3-file               | 3 samples (whole prostate)                                                        | Y         |
+| [He et al.](https://www.nature.com/articles/s41591-021-01244-6)                                                       | 2021 | Human        | Cancer (CRPC)      | N/A; SCP1244                                                                                                                                                                          | .tsv processed count matrices | N=14 (needle biopsy, EPCAM+ CD45+ only)                                           | N         |
+| [Dong et al/Wang et al](https://www.nature.com/articles/s42003-020-01476-1)                                           | 2020 | Human        | Cancer (CRPC)      | GSE137829                                                                                                                                                                             | .txt count matrices           | N=6, biopsy; NED found in 4                                                       | N         |
+| [Qiu et al.](https://www.nature.com/articles/s41467-022-30257-z)                                                      | 2022 | Mouse        | Cancer (CRPC)      | GSE163316                                                                                                                                                                             | .h5                           | N=2 (1 WT, 1 c-myc)                                                               | Y         |
+| [Brady et al.](https://www.nature.com/articles/s41467-021-23780-y)                                                    | 2021 | Mouse        | Cancer (CRPC/NEPC) | GSE158468                                                                                                                                                                             | .h5 (molecule_info)           | N=8 (3 RB, 5 N-myc) (Reprocessed)                                                 | N         |
+| [Chou et al.](https://www.nature.com/articles/s41586-022-04632-1)                                                     | 2022 | Mouse        | Cancer             | GSE195937                                                                                                                                                                             | Seurat Object                 | N=2 (TRAMP mouse)                                                                 | N         |
+| [Chen et al](https://www.nature.com/articles/s41556-020-00613-6).                                                     | 2021 | Human        | Cancer             | GSE1414445                                                                                                                                                                            | .txt count matrices           | N=13 (radical prostatectomy, processed data)                                      | N         |
+| [Vickman et al](https://onlinelibrary.wiley.com/doi/10.1002/pros.23929)                                               | 2020 | Human        | Cancer             | GSE123359                                                                                                                                                                             | standard 3-file               | ncells=3321, CAF only                                                             | N         |
+| [Wong et al](https://www.nature.com/articles/s41467-022-33780-1)                                                      | 2022 | Human        | Cancer (ICC/IDC)   | GSE185344                                                                                                                                                                             | R data file (.rds)            | N=7                                                                               | N         |
+| [Tuong et al](https://www.sciencedirect.com/science/article/pii/S2211124721016284?via%3Dihub)                         | 2021 | Human        | Cancer             | N/A; [prostatecellatlas](http://prostatecellatlas.org/)                                                                                                                               | .h5ad/.rds                    | N=10 (biopsy)                                                                     | N         |
+| [Shah et al](https://aacrjournals.org/cancerres/article/80/21/4612/646076/ERG-Mediated-Coregulator-Complex-Formation) | 2020 | Mouse        | Cancer             | GSE157410                                                                                                                                                                             | Loupe Browser file (.cloupe)  | N=4, prostate organoids                                                           | N         |
+| [Wu et al](https://genomemedicine.biomedcentral.com/articles/10.1186/s13073-021-00885-z)                              | 2021 | Human        | Cancer (primary)   | N/A; [SCP1415](https://singlecell.broadinstitute.org/single_cell/study/SCP1415/cryopreservation-of-human-cancers-conserves-tumour-heterogeneity-for-single-cell-multi-omics-analysis) | .txt                          | N=2                                                                               | N         |
+
+## Data Processing Options
+
+The following metrics are based on Henry et al.(2018) paper. This study is a comprehensive single-cell anatomy of whole prostate and was referred by many other single-cell prostate papers as the "standard" for cell markers, QC, etc.
+
+*For studies with less cells, these standards might be loosened.*
+
+-   Cell count: \>3
+
+-   Feature count (unique genes): \>200
+
+-   Quality control: unique genes is between [200, 5000], mitochondrial genes \<20%
+
+-   Normalization: SCTransform (corrects for difference in sequencing depth), ~~scaling factor=10000, log-transformed~~
+
+-   Variations to regress: mt.percent, *cell-cycle scoring (optional)*, *stress scoring (optional)*
+
+-   Variable feature selection: 2000 features
+
+-   Dimension Reduction methods: PCA (max PC=50), UMAP (PC=30)
+
+-   Clustering resolution: Default 0.8
+
+-   Identity Assignment: ScType, complemented by Manual (See the following sections for a list of canonical markers)
+
+-   Data Integration: Merge or Integrate
+
+## How To Use This File
+
+This file is intended to be used as a source of reference.
+
+Code for each step are organized in chunks. I recommend copy-paste the sections into a new R script file and make changes there, but you can also modify the code and run directly within this file. If running directly, only run chunks that are suitable for your data. Output will appear right under the corresponding chunk (including figures) and the console (excluding figures). If using a R script, output will appear in the console and figures will appear in the "Plots" window.
+
+------------------------------------------------------------------------
+
+# Seurat Analysis Pipeline
+
+## R Set-up
+
+```{r rmd.setup}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE, warning=FALSE)
+```
+
+```{r env.setup}
+# Clear screen
+cat("\014")
+# Clear any existing plots
+graphics.off()
+# Clear environment
+rm(list=ls())
+# Set directory to the current directory
+this.dir = dirname(rstudioapi::getActiveDocumentContext()$path)
+setwd(this.dir)
+# Restart R session if something went wrong
+#.rs.restartR() 
+```
+
+## Package Dependencies
+
+Please install package dependencies according to specific needs.
+
+Notice that packages from github might require additional compiler to build (gcc, g++, rlang, etc). For windows, install the newest Rtools can solve this problem. For macOS, install command line tools (xcode-select).                                                     
+
+```{r install}
+# Packages required by Seurat
+install.packages('Seurat')
+# alternatively, install seurat v5 (require g++ compiler)
+#remotes::install_github("satijalab/seurat", "seurat5")
+# BPcells for rapid cell counting (require gcc compiler)
+#remotes::install_github("bnprks/BPCells")
+install.packages('patchwork')
+install.packages('dplyr')
+install.packages('ggplot2')
+# not sure if still need to install separately from Seurat
+#install.packages('sctransform')
+
+# additional packages for visualization
+install.packages("ggcorrplot")
+install.packages("ggExtra")
+
+# packages for pathway enrichment
+install.packages("enrichr")
+install.packages("msigdbr")
+
+# Packages required by ScType (marker-based cell type assignment)
+# A package to check and correct ill-formatted gene symbols
+install.packages('HGNChelper')
+install.packages('data.tree')
+install.packages('tidyverse')
+install.packages('ggraph')
+install.packages('igraph')
+
+# Additional, optional packages
+# A plot theme package that generate graphs that are suitable for publication
+install.packages('cowplot')
+
+# Some packages are only available on Bioconductor
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("scater")
+# For reading .h5 files
+BiocManager::install("hdf5r")
+# For using SingleR (reference-based cell type assignment)
+BiocManager::install("SingleR")
+BiocManager::install('celldex')
+BiocManager::install("scRNAseq")
+BiocManager::install("glmGamPoi")
+
+# For enrichment analysis
+BiocManager::install("enrichR")
+BiocManager::install("fgsea")
+organism = "org.Hs.eg.db"
+BiocManager::install(organism, character.only = TRUE)
+library(organism, character.only = TRUE)
+
+# New Seurat Packages for HDF5-based file formats
+if (!requireNamespace("remotes", quietly = TRUE)) {
+  install.packages("remotes")
+}
+remotes::install_github("mojaveazure/seurat-disk")
+
+# Some packages require installation from github
+if (!requireNamespace("devtools", quietly = TRUE)) {
+  install.packages("devtools")
+}
+
+# CellChat: Make sure to install the following packages IN ORDER
+install.packages('NMF')
+devtools::install_github("jokergoo/circlize")
+devtools::install_github("jokergoo/ComplexHeatmap")
+reticulate::py_install(packages ='umap-learn')
+
+# require g++ compiler
+devtools::install_github("sqjin/CellChat")
+
+# monocle3, for trajectory and pseudotime analysis
+devtools::install_github('cole-trapnell-lab/monocle3')
+
+# ucell, for gene-set scoring based annotation
+BiocManager::install("UCell")
+
+
+```
+
+Load required libraries. Some packages will have overlap functions that generate warnings, but it does not affect normal use.
+
+```{r libraries, warning=F}
+# For using Python functionalities in R
+library(reticulate)
+# May need to change path to python
+use_python("/usr/local/bin/python")
+library(Seurat)
+# SCTransform
+library(sctransform)
+library(dplyr)
+library(patchwork)
+library(ggplot2)
+# Set plot themes
+library(cowplot)
+theme_set(theme_cowplot())
+#library(scRNAseq)
+# A package to check and correct ill-formatted gene symbols, needed for marker detection and cell type assignment
+library(HGNChelper)
+# for .h5 files
+library(hdf5r)
+# For SingleR
+#library(SingleR)
+#library(celldex)
+library(CellChat)
+```
+
+## Data Loading and Creating Seurat Objects
+
+Remember to change `data.path` and `output.path` to where your data is and where you want to save your output. Seurat objects integrate metadata such as clusters, percent.mt with the count matrix and are the standard format for all subsequent analysis steps. It is also possible to cross-analyze multiple datasets by integrating multiple seurat objects.
+
+### Standard 3-file (Barcodes+Genes+Matrix) Format
+
+Needs to provide `barcodes.tsv`, `genes.tsv`, `matrix.mtx` in the designated directory. Example: Pd dataset (1 normal human prostate sample)
+
+```{r import}
+# Set data and output paths
+data.path= "../Data/Henry_2018/Pd_filtered_gene_bc_matrices/"
+output.path="../Output/Henry_2018/Pd/"
+# Create output path if not exist
+if(!dir.exists(output.path)) dir.create(output.path, recursive=TRUE)
+# read data
+Pd.data <- Read10X(data.dir = data.path)
+Pd <- CreateSeuratObject(counts = Pd.data, project = "pd", min.cells = 3, min.features = 200)
+# Save seurat object (optional)
+# saveRDS(Pd, file=paste0(output.path, "pd_raw_seurat.rds"))
+# Remove raw data to save space (optional)
+# rm(Pd.data)
+```
+
+### H5 Format, Bulk Processing
+
+Sometimes you may want to process multiple files at the same time. For .h5 files, make sure you have installed and loaded the "rhdf5" library. To load data in .h5 format, use `Read10X_h5()` instead of `Read10X()`
+
+**New**: Seurat-disk package provides HDF5-based file support. Use `Convert()`and`LoadH5Seurat()`to create Seurat Objects.
+
+Example: GSE172352 (4 normal mouse prostate samples)
+
+```{r bulk h5}
+# Set data and output paths
+data.path="../Data/Joseph_2021/GSE172352_RAW/"
+output.path="../Output/Joseph_2021/GSE172352/"
+
+# Obtain list of data files
+if(dir.exists(data.path)) files <- list.files(path=data.path) else print("Invalid Data Path!")
+# Create output path if not exist
+if(!dir.exists(output.path)) dir.create(output.path, recursive=TRUE)
+
+# Specify sample names
+sample_names <- c("muAd001_PrF", "muAd002_PrF", "muAd003_PrF_St", "muAd007_PrFcol_GEX")
+samples <- list()
+samples_data <- list()
+samples_summary=NULL
+
+# Creating Seurat Objects in bulk
+for(i in 1:length(files)){
+  cat("Reading", files[i], " \n")
+  dat <- Read10X_h5(paste0(data.path, files[i]))
+  samples_data[[i]] <- dat
+  cat("Creating Seurat Object for", sample_names[i], "\n")
+  samples[[i]] <- CreateSeuratObject(dat, project=sample_names[i], min.cells = 3, min.features = 200)
+  Idents(samples[[i]], cells=1:ncol(samples[[i]])) <-sample_names[i]
+  # Bulk save rds, optional
+  #cat("Saving RDS for", sample_names[i], "\n")
+  #saveRDS(samples[[i]], file=paste0(output.path, sample_names[i], "_seurat.rds"))
+  rm(dat)
+}
+```
+
+#### Troubleshoot: `molecule_info.h5`
+
+The `cellranger` output actually has two .h5 files (see [Understanding Outputs: Output Files Overview](https://support.10xgenomics.com/single-cell-gene-expression/software/pipelines/latest/output/overview#output-overview)) . The `filtered_feature_bc_matrix.h5` is the actual count matrix which is directly readable by the read10X_h5() function. The other file is either `molecule_info.h5` or `sample_molecule_info.h5`, and attempting to read this kind of files in R will result in an error. In some cases, the researchers might have only provided the latter file in the repository, but this does not mean the file is not usable.
+
+`molecule_info.h5` is essentially detailed per-molecule metadata about barcodes, features, reads, library, umi, etc. (see [Understanding Outputs: Molecule Info](https://support.10xgenomics.com/single-cell-gene-expression/software/pipelines/latest/output/molecule_info)), and in fact contains all the information we need to construct the count matrix. The `cellranger aggr` pipeline can be readily used to reanalyze and regenerate the desired output based on `molecule_info` alone.
+
+`cellranger aggr` is originally intended to aggregate multiple samples into a single output and correct for sequence depth differences ( see [Aggregated Outputs](https://support.10xgenomics.com/single-cell-gene-expression/software/pipelines/latest/output/aggr-outputs)), but we can also feed single samples. The output will have the count matrix in multiple format (.h5, .cloupe, 3-file) as well as a web summary.
+
+**System Requirement:** You will need a **Linux** machine with `cellranger` and appropriate reference files installed. Either a local machine or a remote server may work. Minimum system requirements can be found [here](https://support.10xgenomics.com/single-cell-gene-expression/software/overview/system-requirements). I used CRC which has the newest version of `cellranger` installed. For reference, each run takes several minutes.
+
+**File Requirement:** an aggregation `.csv` file specifying sample id and `molecule_info.h5` file location, and corresponding `molecule_info.h5`. In specific, the file should look like this:
+
+| sample_id | molecule_h5                              |
+|-----------|------------------------------------------|
+| M0001     | /absolute/path/to/M0001_molecule_info.h5 |
+| M0002     | /absolute/path/to/M0001_molecule_info.h5 |
+| ...       | ...                                      |
+
+: It's optional to include additional columns for metadata (such as phenotype/genotype).
+
+**Run Pipeline:** In the terminal, type: `cellranger aggr --id=<JOBID>  --csv=<AGGREGATION.CSV>`
+
+See [Running cellranger aggr](https://support.10xgenomics.com/single-cell-gene-expression/software/pipelines/latest/using/aggregate) for more details.
+
+### Text Format
+
+Use `read.table()`
+
+Example: Song et al.
+
+```{r text}
+# Unzip files
+for (i in 1:length(files)){
+  cat(i,"/", length(files), "Unzipping", files[i], "...\n")
+  gunzip(paste0(data.path,files[i]))
+}
+
+for (i in 1:length(sample_names)){
+  cat("Sample", i, "of", length(sample_names), "\n")
+  cat("Reading", sample_names[i], "...\n")
+  dat <- read.table(paste0(data.path, sample_names[i], "_dge.txt"), header=TRUE, row.names=1)
+  sample_data[[i]] <- dat
+  samples[[i]] <- CreateSeuratObject(dat, project=sample_names[i], min.cells=3, min.features=200)
+  cat("Saving RDS for", sample_names[i], "...\n")
+  saveRDS(samples[[i]], file=paste0(output.path, sample_names[i], "_seurat.rds"))
+  rm(dat)
+}
+```
+
+## Downsampling
+
+```{r downsampling}
+# Downsample the data sets (from minimally processed data)
+ncells=5000
+pd_small <- pd[, sample(colnames(pd), size=ncells, replace=F)]
+# Rename cells 
+pd_small <- RenameCells(pd_small, add.cell.id='pd')
+saveRDS(pd_small, file=paste0(output.path, "pd_small.rds"))
+d27_small <- d27[, sample(colnames(d27), size=ncells, replace=F)]
+d27_small <- RenameCells(d27_small, add.cell.id='d27')
+saveRDS(d27_small, file=paste0(output.path, "d27_small.rds"))
+d17_small <- d17[, sample(colnames(d17), size=ncells, replace=F)]
+d17_small <- RenameCells(d17_small, add.cell.id='d17')
+saveRDS(d17_small, file=paste0(output.path, "d17_small.rds"))
+```
+
+## Single-Command Workflow using SCTransform
+
+SCTransform is a new feature in Seurat V3, which is a improved scale and normalization method. The single command `SCTransform()` replaces `NormalizeData()`, `ScaleData()`, and `FindVariableFeatures()`. Details about SCTransform can be found [here](https://satijalab.org/seurat/articles/sctransform_vignette.html). In short, SCTransform mitigates technical effects like differences in sequencing depth and returns sharper biological signals. In the newest Seurat V4, most Seurat functions now support SCTransform, and thus is the preferred method, especially when doing cross-dataset analysis.
+
+```{r single command}
+pd <- CreateSeuratObject(pd_data, project="pd", min.cells=3, min.features=200) %>%
+    PercentageFeatureSet(pattern = "^MT-", col.name = "percent.mt") %>%
+    subset(nFeature_RNA>200 & nFeature_RNA<3000 & percent.mt<20) %>% 
+    SCTransform(vars.to.regress = "percent.mt") %>%
+    RunPCA(dims=1:50) %>%
+    FindNeighbors(dims = 1:30) %>%
+    RunUMAP(dims = 1:30) %>%
+    FindClusters()
+```
+
+## Traditional Workflow
+
+### QC (Fixed Standard)
+
+```{r qc}
+# If starting with .rds, uncomment and run the following line
+# Pd <- readRDS(file=paste0(output.path, "pd_seurat.rds"))
+
+# Calculate % mito genes
+Pd[["percent.mt"]] <- PercentageFeatureSet(Pd, pattern = "^MT-")
+# Optional step to calculate ribosomal genes percentage. For mouse, the pattern is "^(Rpl|Rps)"
+Pd[["percent.ribo"]] <- PercentageFeatureSet(Pd, pattern = "^(RPL|RPS)")
+# QC Visualization
+VlnPlot(Pd, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+ggsave(file="QCViolinPlot.png",path=output.path)
+# You can specify figure size to save
+#ggsave(file="QCViolinPlot.png",path=output.path, width = 40,height = 20,units = "cm")
+plot1 <- FeatureScatter(Pd, feature1 = "nCount_RNA", feature2 = "percent.mt")
+plot2 <- FeatureScatter(Pd, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+plot1 + plot2
+ggsave(file="QCScatterPlot.png",path=output.path)
+# Remove temporary plots
+rm(plot1, plot2)
+
+# The Song group sets the threshold to 300 genes, 500 transcripts and 20% mito genes
+# But here we use parameters from Henry et al.
+Pd <- subset(Pd, subset = nFeature_RNA>200 & nFeature_RNA<5000 & percent.mt < 20)
+```
+
+### QC (Flexible Standard)
+
+```{r qc dynamic}
+for(i in 1:length(sample_names)){
+  #pb$tick()
+  cat("Processing sample",i, "of", length(sample_names), ":", sample_names[i], "...\n")
+  samples[[i]]@meta.data$Barcodes <- rownames(samples[[i]]@meta.data)
+  samples_summary$sample[i]=sample_names[i]
+  samples_summary$ncells_preQC[i]=dim(samples[[i]])[2]
+  cat("Calculating percent.mt, percent.ribo", "...\n")
+  # mitochondrial percentage
+  samples[[i]][["percent.mt"]] <- PercentageFeatureSet(samples[[i]], pattern = "^mt-")
+  # ribosomal percentage
+  samples[[i]][["percent.ribo"]] <- PercentageFeatureSet(samples[[i]], pattern = "^(Rpl|Rps)")
+  # QC violin plot
+  cat("Generating QC plot", "...\n")
+  VlnPlot(samples[[i]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.ribo"), ncol = 4, pt.size=0.5)
+  ggsave(file=paste0(sample_names[i], "_QCVlnPlot.png"),path=output.path, width = 12, height=8, units = "in")
+  # Relation between nCount_RNA and nFeature_RNA detected
+  p1 <- ggplot(samples[[i]]@meta.data, aes(x=nCount_RNA, y=nFeature_RNA)) + geom_point() + geom_smooth(formula = y ~ x, method="lm")
+  p1 <- ggMarginal(p1, type = "histogram", fill="lightgrey", bins = 30)
+  p2 <- ggplot(samples[[i]]@meta.data, aes(x=log10(nCount_RNA), y=log10(nFeature_RNA))) + geom_point() + geom_smooth(formula = y ~ x, method="lm")
+  p2 <- ggMarginal(p2, type = "histogram", fill="lightgrey", bins = 30)
+  plot_grid(plotlist = list(p1,p2), ncol=2, align='h', rel_widths = c(1, 1))
+  ggsave(file=paste0(sample_names[i], "_QCHistogram.png"),path=output.path, width = 16, height=8, units = "in")
+  samples_summary$mean_mt[i]=mean(na.omit(samples[[i]]$percent.mt))
+  samples_summary$mean_ribo[i]=mean(na.omit(samples[[i]]$percent.ribo))
+  # Dynamic filtering
+  # mt
+  #pb$tick()
+  cat("Filtering by percent.mito", "...\n")
+  Cell.QC.Stat <- samples[[i]]@meta.data
+  max.mito.thr <- median(Cell.QC.Stat$percent.mt) + 3*mad(Cell.QC.Stat$percent.mt)
+  min.mito.thr <- median(Cell.QC.Stat$percent.mt) - 3*mad(Cell.QC.Stat$percent.mt)
+  samples_summary$max_mito_thr[i] <- max.mito.thr
+  samples_summary$min_mito_thr[i] <- min.mito.thr
+  ncellrm <- as.numeric(table(Cell.QC.Stat$percent.mt > max.mito.thr | Cell.QC.Stat$percent.mt < min.mito.thr)[2])
+  ncellpass <- as.numeric(table(Cell.QC.Stat$percent.mt > max.mito.thr | Cell.QC.Stat$percent.mt < min.mito.thr)[1])
+  samples_summary$ncells_post_mito_QC[i] <- ncellpass
+  samples_summary$pct_post_mito_QC[i] <- as.numeric(ncellpass/samples_summary$ncells_preQC[i])
+  cat("Generating QC plot", "...\n")
+  filename <- paste0(sample_names[i], "_mt_QC.png")
+  p1 <- ggplot(Cell.QC.Stat, aes(x=nFeature_RNA, y=percent.mt)) +
+    geom_point() +
+    geom_hline(aes(yintercept = max.mito.thr), colour = "red", linetype = 2) +
+    geom_hline(aes(yintercept = min.mito.thr), colour = "red", linetype = 2) +
+    annotate(geom = "text", label = paste0(ncellrm, " cells removed\n",
+                                           ncellpass," cells remain"), x = 6000, y = 0.1)
+  p1 <- ggMarginal(p1, type = "histogram", fill="lightgrey", bins=100) 
+  #grid::grid.draw(p1)
+  #ggsave(filename=filename, path=output.path, width = 10, height=10, units = "in")
+  #invisible(dev.off())
+  
+  # Filter percent.mt
+  Cell.QC.Stat <- Cell.QC.Stat %>% filter(percent.mt < max.mito.thr) %>% filter(percent.mt > min.mito.thr)
+  
+  #nFeature_RNA, nCount_RNA
+  #pb$tick()
+  cat("Filtering by nFeature_RNA, nCount_RNA", "...\n")
+  samples_summary$median_nGene[i]=median(samples[[i]]$nFeature_RNA)
+  samples_summary$mean_nGene[i]=mean(samples[[i]]$nFeature_RNA)
+  samples_summary$median_nUMI[i]=median(samples[[i]]$nCount_RNA)
+  samples_summary$mean_nUMI[i]=mean(samples[[i]]$nCount_RNA)
+  # Set low and hight thresholds on the number of detected genes
+  min.Genes.thr <- median(log10(Cell.QC.Stat$nFeature_RNA)) - 3*mad(log10(Cell.QC.Stat$nFeature_RNA))
+  max.Genes.thr <- median(log10(Cell.QC.Stat$nFeature_RNA)) + 3*mad(log10(Cell.QC.Stat$nFeature_RNA))
+  samples_summary$max_genes_thr[i] <- max.Genes.thr
+  samples_summary$min_genes_thr[i] <- min.Genes.thr
+  # Set hight threshold on the number of transcripts
+  max.nUMI.thr <- median(log10(Cell.QC.Stat$nCount_RNA)) + 3*mad(log10(Cell.QC.Stat$nCount_RNA))
+  samples_summary$max_umi_thr[i] <- max.nUMI.thr
+  
+  #filter ngene, numi
+  #pb$tick()
+  Cell.QC.Stat <- Cell.QC.Stat %>% filter(log10(nFeature_RNA) > min.Genes.thr) %>% filter(log10(nCount_RNA) < max.nUMI.thr)
+  lm.model <- lm(data = Cell.QC.Stat, formula = log10(nFeature_RNA) ~ log10(nCount_RNA))
+  samples_summary$ncells_post_gene_umi_QC[i] <- dim(Cell.QC.Stat)[1]
+  samples_summary$pct_post_gene_umi_QC[i] <- as.numeric(dim(Cell.QC.Stat)[1]/samples_summary$ncells_preQC[i])
+  cat("Generating QC plot", "...\n")
+  filename <- paste0(output.path, sample_names[i], "_Gene_UMI_postQC.png")
+  p2 <- ggplot(Cell.QC.Stat, aes(x=log10(nCount_RNA), y=log10(nFeature_RNA))) +
+    geom_point() +
+    geom_smooth(formula = y ~ x,method="lm") +
+    geom_hline(aes(yintercept = min.Genes.thr), colour = "green", linetype = 2) +
+    geom_hline(aes(yintercept = max.Genes.thr), colour = "green", linetype = 2) +
+    geom_vline(aes(xintercept = max.nUMI.thr), colour = "red", linetype = 2) +
+    geom_abline(intercept = lm.model$coefficients[1] - 0.09 , slope = lm.model$coefficients[2], color="orange") +
+    annotate(geom = "text", label = paste0(dim(Cell.QC.Stat)[1], " QC passed cells"), x = 4, y = 3.8)
+  p2 <- ggMarginal(p2, type = "histogram", fill="lightgrey", bins = 30)
+  #grid::grid.draw(p2)
+  #ggsave(filename=filename, path=output.path, width = 10, height=10, units = "in")
+  #invisible(dev.off())
+  
+  # filter by ngene/numi ratio
+  #pb$tick()
+  cat("Filtering by nGene/nUMI ratio", "...\n")
+  Cell.QC.Stat$valideCells <- log10(Cell.QC.Stat$nFeature_RNA) > (log10(Cell.QC.Stat$nCount_RNA) * lm.model$coefficients[2] + (lm.model$coefficients[1] - 0.09))
+  ncellrm <- as.numeric(table(Cell.QC.Stat$valideCells)[1])
+  ncellpass <- as.numeric(table(Cell.QC.Stat$valideCells)[2])
+  samples_summary$ncells_post_lm_QC[i] <- ncellpass
+  samples_summary$pct_post_lm_QC[i] <- ncellpass/samples_summary$ncells_preQC[i]
+  cat("Generating QC plot", "...\n")
+  filename <- paste0(sample_names[i], "_Gene_UMI_ratio_QC.png")
+  p3 <- ggplot(Cell.QC.Stat, aes(x=log10(nCount_RNA), y=log10(nFeature_RNA))) +
+    geom_point(aes(colour = valideCells)) +
+    geom_smooth(formula = y ~ x, method="lm") +
+    geom_abline(intercept = lm.model$coefficients[1] - 0.09 , slope = lm.model$coefficients[2], color="orange") + 
+    theme(legend.position="none") +
+    annotate(geom = "text", label = paste0(as.numeric(table(Cell.QC.Stat$valideCells)[2]), " QC passed cells\n",
+                                           as.numeric(table(Cell.QC.Stat$valideCells)[1]), " QC filtered"), x = 4, y = 3.8)
+  p3 <- ggMarginal(p3, type = "histogram", fill="lightgrey", bins = 30)
+  #grid::grid.draw(p3)
+  #ggsave(filename=filename, path=output.path, width = 10, height=10, units = "in")
+  #invisible(dev.off())
+  
+  plot_grid(plotlist = list(p1,p2,p3), ncol=3, align='h', rel_widths = c(1, 1, 1))
+  ggsave(file=paste0(sample_names[i], "_QCPlots.png"),path=output.path, width = 25, height=8, units = "in")
+  
+  # filter cells
+  Cell.QC.Stat <- Cell.QC.Stat %>% filter(valideCells)
+  
+  samples[[i]] <- subset(samples[[i]], cells= Cell.QC.Stat$Barcodes)
+  cat("Saving filtered data", "...\n")
+  saveRDS(samples[[i]], file=paste0(output.path, sample_names[i], "_filtered_seurat.rds"))
+  cat("Removing temporary files", "...\n")
+  rm(Cell.QC.Stat, lm.model, p1, p2, p3, max.Genes.thr, max.mito.thr, max.nUMI.thr, min.Genes.thr, min.mito.thr, ncellpass, ncellrm)
+  cat("**********************************", "\n")
+  
+}
+write.csv(samples_summary, file=paste0(output.path, "QC_summary.csv"))
+```
+
+### Doublet Detection (DoubletFinder)
+
+Although we have roughly removed multiplets by excluding "cells" with more than 3000 unique features, there may still be some doublets remaining in our dataset. Currently, Sajita Lab (the developers of Seurat) recommend using the [DoubletFinder package](https://github.com/chris-mcginnis-ucsf/DoubletFinder) for doublet prediction. There are other tools available as well, but less compatible with Seurat.
+
+Best Practice for using DoubletFinder:
+
+-   Not to be applied to aggregated scRNA-seq data
+
+-   Not recommended to run on merged data (ok to do, if it is one sample split to seperate lanes)
+
+-   Should be run on individual samples seperately
+
+-   input data should be cleared of low-quality cells
+
+Expected multiplet rate is as below: (source: <https://uofuhealth.utah.edu/huntsman/shared-resources/gba/htg/single-cell/genomics-10x>)
+
+Caution: This is VERY slow
+
+| Multiplet rate (%) | \# of Cell Loaded | \# of Cell Recovered |
+|--------------------|-------------------|----------------------|
+| 0.40%              | 800               | 500                  |
+| 0.80%              | 1,600             | 1,000                |
+| 1.60%              | 3,200             | 2,000                |
+| 2.30%              | 4,800             | 3,000                |
+| 3.10%              | 6,400             | 4,000                |
+| 3.90%              | 8,000             | 5,000                |
+| 4.60%              | 9,600             | 6,000                |
+| 5.40%              | 11,200            | 7,000                |
+| 6.10%              | 12,800            | 8,000                |
+| 6.90%              | 14,400            | 9,000                |
+| 7.60%              | 16,000            | 10,000               |
+
+```{r doublet}
+# install the package
+if(!require("remotes")){
+  install.packages("remotes")
+}
+remotes::install_github('chris-mcginnis-ucsf/DoubletFinder')
+
+# Load required packages
+library(DoubletFinder)
+
+for (i in 1:length(sample_names)){
+  cat("Processing sample",i, "of", length(sample_names), ":", sample_names[i], "...\n")
+  samples[[i]] <- SCTransform(samples[[i]], verbose = F)
+  samples[[i]] <- RunPCA(samples[[i]], verbose = F)
+  samples[[i]] <- RunUMAP(samples[[i]], dims = 1:10, verbose = F)
+  samples[[i]] <- FindNeighbors(samples[[i]], dims = 1:10, verbose = F)
+  samples[[i]] <- FindClusters(samples[[i]], verbose = F)
+  sweep.res.list <- paramSweep_v3(samples[[i]], PCs = 1:10, sct = TRUE)
+  sweep.stats <- summarizeSweep(sweep.res.list, GT = FALSE)
+  bcmvn <- find.pK(sweep.stats)
+  pK <- bcmvn[which.max(bcmvn$BCmetric),]$pK
+  annotations <- samples[[i]]$seurat_clusters
+  homotypic.prop <- modelHomotypic(annotations)
+  nExp_poi <- round(0.05*nrow(samples[[i]]@meta.data)) 
+  nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
+  samples[[i]] <- doubletFinder_v3(samples[[i]], PCs = 1:10, pN = 0.25, pK = pK, nExp = nExp_poi, reuse.pANN = FALSE, sct = T)
+  samples[[i]] <- doubletFinder_v3(samples[[i]], PCs = 1:10, pN = 0.25, pK = pK, nExp = nExp_poi.adj, reuse.pANN = "pANN_0.25_0.01_1000", sct = T)
+}
+
+```
+
+### Doublet Detection (Scrublet)
+
+See [Scrublet Basics](https://github.com/swolock/scrublet/blob/master/examples/scrublet_basics.ipynb) for an example of using scrublet in Python.
+
+```{r scrublet}
+# make sure reticulate is correctly configured in order to use python functions in r.
+library(reticulate)
+# import scrublet, make sure scrublet is already installed. If not, open terminal and do "pip install scrublet"
+library(reticulate)
+#use_python("C:/Users/platina/AppData/Local/Programs/Python/Python310/python.exe")
+py_config()
+library(nmslibR)
+scr <- import("scrublet")
+scipy <- import("scipy")
+cat("QC: detecting obvious doublets", "...\n")
+for (i in 1:length(sample_names)){
+  cat("Processing sample",i, "of", length(sample_names), ":", sample_names[i], "...\n")
+  cat("Acquiring count matrix", "...\n")
+  counts_matrix <-  GetAssayData(samples[[i]], slot="count")
+  counts_matrix <- TO_scipy_sparse(counts_matrix)
+  counts_matrix = counts_matrix$T$tocsc()
+  cat("Predicting doublets", "...\n")
+  nn <- round(0.5*sqrt(dim(samples[[i]])[2]))
+  scrub <- scr$Scrublet(counts_matrix, expected_doublet_rate = 0.05, sim_doublet_ratio=2L, n_neighbors = nn)
+  scrublet_res <- scrub$scrub_doublets(min_counts=2, min_cells=3, min_gene_variability_pctl=85, n_prin_comps = 25L)
+  samples[[i]]$doublet_score <- scrublet_res[[1]]
+  # In general a threshold of 0.2 works fine with doublets
+  samples[[i]]$predicted_doublet <- ifelse(samples[[i]]$doublet_score > 0.2, "Doublet","Singlet")
+  samples_summary$nDoublet[i] <- table(samples[[i]]$predicted_doublet)[1]
+  samples_summary$nSinglet[i] <- table(samples[[i]]$predicted_doublet)[2]
+  samples_summary$pct_singlet[i] <- sum(samples[[i]]$predicted_doublet==FALSE)/dim(samples[[i]])[2]
+  ggplot(samples[[i]]@meta.data, aes(x = doublet_score, stat(ndensity))) +
+    geom_histogram(bins = 200, colour ="lightgrey")+
+    geom_vline(xintercept = 0.2, colour = "red", linetype = 2)
+  ggsave(paste0(sample_names[i],"_doublet_hist.png"), path=output.path)
+  cat("Removing", samples_summary$nDoublet[i], "doublets in",dim(samples[[i]])[2],"cells", "...\n")
+  samples[[i]] <- subset(samples[[1]], subset=predicted_doublet=="Singlet")
+  cat("Saving filtered data", "...\n")
+  saveRDS(samples[[i]], file=paste0(output.path, sample_names[i], "_filtered_seurat.rds"))
+  rm(counts_matrix, scrub, scrublet_res)
+  cat("**********************************", "\n")
+}
+
+write.csv(samples_summary, file=paste0(output.path, "QC_summary.csv"))
+```
+
+### Normalization
+
+```{r normalize}
+# Normalization, feature selection, scaling
+Pd <- NormalizeData(Pd, normalization.method = "LogNormalize", scale.factor = 10000)
+Pd <- FindVariableFeatures(Pd, selection.method="vst", nfeatures=2000)
+top10 <- head(VariableFeatures(Pd),10)
+plot1 <- VariableFeaturePlot(Pd)
+plot1 <- LabelPoints(plot=plot1, points=top10, repel=TRUE)
+plot1
+ggsave(file="VariableFeaturePlot.png",path=output.path)
+rm(plot1)
+```
+
+### Scaling and Removing Noises
+
+```{r mt scale}
+# Scale with all genes(super slow, not recommended)
+#all.genes <- rownames(Pd)
+#Pd <- ScaleData(Pd, features = all.genes)
+
+# Scale only featured genes, regress out mitochondrial genes
+Pd <- ScaleData(Pd, features=VariableFeatures(object = Pd), vars.to.regress = "percent.mt")
+
+# SCTransform, use with caution
+# Pd <- SCTransform(Pd, method = "glmGamPoi", vars.to.regress = "percent.mt", verbose = FALSE)
+
+# Save an RDS file for easier loading (optional)
+# saveRDS(Pd, file = "./output/Pd/Pd_filtered.rds")
+```
+
+### Cell Cycle Scoring (optional)
+
+```{r cc scoring}
+# Cell Cycle Scoring with cell cycle gene set implemented in the Seurat library
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+Pd <- CellCycleScoring(Pd, s.features=s.genes, g2m.features = g2m.genes, set.ident=T)
+# Visualize cell cycle markers
+RidgePlot(Pd, features = c("PCNA", "TOP2A", "MCM6", "MKI67"), ncol = 2)
+ggsave("CellCycleMarkers.png", path="./output/Pd", width = 20,height = 20,units = "cm")
+# Visualization before filtering
+Pd <- RunPCA(Pd, features=c(s.genes, g2m.genes))
+Dimplot(Pd)
+# Regress out all signals associated with cell cycle
+Pd <- ScaleData(Pd, features=VariableFeatures(object = Pd), vars.to.regress = c("S.Score", "G2M.Score"), features=rownames(Pd))
+# Visualization after filtering
+Pd <- RunPCA(Pd, features=c(s.genes, g2m.genes))
+Dimplot(Pd)
+
+# Alternative workflow, if need to study differentiation process (i.e., keeps the difference between quiescent and proliferating cells)
+# Pd$CC.Difference <- Pd$S.Score - Pd$G2M.Score
+# Pd <- ScaleData(Pd, features=VariableFeatures(object = Pd), vars.to.regress = "CC.Difference", features=rownames(Pd))
+```
+
+### Stress Scoring (optional)
+
+```{r stress}
+# Stress Scoring with stress genes used by Henry et al.
+stress.genes = list(c("JUN","FOS","EGR1","ATF3","JUNB","GADD45B","IER2","ZFP36","DNAJB1","RHOB","NR4A1","UBC","HES1"))
+# Visualization before filtering
+Pd <- RunPCA(Pd, features=stress.genes)
+Dimplot(Pd)
+Pd <- AddModuleScore(Pd, features=stress.genes, name="Stress.Score")
+# Regress out variation due to cellular stress
+Pd <- ScaleData(Pd, features=VariableFeatures(object = Pd), vars.to.regress = "Stress.Score", features=rownames(Pd))
+# Visualization after filtering
+Pd <- RunPCA(Pd, features=stress.genes)
+Dimplot(Pd)
+
+# Alternatively,visualize stress by
+FeaturePlot(pd, features="Stress.Score1")
+
+```
+
+### Filter Unwanted Genes
+
+When some clusters express unusually high ribosomal/hemoglobin/mitochondrial genes, there are several strategies:
+
+1)  remove these cells (preferred)
+2)  exclude ribosomal/hemoglobin/mitochondrial genes from clustering
+3)  remove unwanted genes altogether (not suggested unless sample size is small and you don't wanna risk losing many cells)
+
+Reference: [Seurat: Quality Control](https://nbisweden.github.io/workshop-scRNAseq/labs/compiled/seurat/seurat_01_qc.html#MitoRibo_filtering)
+
+```{r filt-gene}
+# Filter Mitocondrial
+data.filt <- data.filt[!grepl("^MT-", rownames(data.filt)), ]
+
+# Filter Ribosomal gene (optional if that is a problem on your data)
+# data.filt <- data.filt[ ! grepl('^RP[SL]', rownames(data.filt)), ]
+
+# Filter Hemoglobin gene (optional if that is a problem on your data)
+data.filt <- data.filt[!grepl("^HB[^(P)]", rownames(data.filt)), ]
+```
+
+## Data Integration
+
+Sometimes one study may contain multiple biological replicates/multiple samples, and we are interested in examining the overall effect across samples. Or, we might be interested in doing a joint analysis of two or more studies. In both cases, we may want to combine individual data sets into one big object and conduct all subsequent analysis on it. There are two preferred methods of data integration: merge datasets and use Harmony to remove batch effects, or perform anchor-based integration in Seurat V3/V4. See [this paper](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1850-9) for a comparison of different integration methods.
+
+### Merging+Harmony (Preferred)
+
+[Harmony](https://portals.broadinstitute.org/harmony/articles/quickstart.html) is an R package to quickly integrate scRNA-seq data and remove batch effects from different biological replicates, technology, etc. We can directly merge the data, add the sample information/treatment information into meta data, and continue our analysis.
+
+Vignette: [**Integration of datasets using Harmony**](https://htmlpreview.github.io/?https://github.com/satijalab/seurat.wrappers/blob/master/docs/harmony.html)
+
+Troubleshoot: if installation fails, it might be a issue with the gfortran library in the new MacOS. Try install the latest gfortran [here](https://github.com/fxcoudert/gfortran-for-macOS/releases).
+
+```{r harmony}
+devtools::install_github("immunogenomics/harmony")
+library(harmony)
+
+merged.sct <- PercentageFeatureSet(merged.sct, pattern = "^MT-", col.name = "percent.mt") %>%
+  subset(nFeature_RNA>200 & nFeature_RNA<3000 & percent.mt<20) %>% 
+  SCTransform(vars.to.regress = c("percent.mt")) %>%
+  RunPCA(dims=1:50) %>%
+  # remove batch effect
+  RunHarmony(group.by.vars = "sample_id") %>% 
+  # set reduction="harmony" when running umap
+  RunUMAP(reduction = "harmony", dims = 1:30) %>%
+  FindNeighbors(reduction = "harmony", dims = 1:30) %>%
+  FindClusters()
+
+```
+
+### Anchor-Based Integration
+
+For comparing data sets with different treatment, or from different studies/platforms/species, the preferred way of data integration is anchor-based. The `integrated` assay in Seurat computes shared features ('anchors') across a list of data sets and performs PCA/UMAP on these common features. For more information, see the [Seurat vignette for data integration](https://satijalab.org/seurat/articles/integration_introduction.html).
+
+```{r anchor}
+# create a list for all datasets of interest
+data.list <-NULL
+data.list[["pd"]] <- pd_small
+data.list[["d17"]] <- d17_small
+data.list[["d27"]] <- d27_small
+
+# SCTransform
+data.list <- lapply(data.list, FUN=SCTransform, vars.to.regress="percent.mt")
+# Select integration features
+features <- SelectIntegrationFeatures(object.list = data.list, nfeatures = 3000)
+# Additional step to prepare sctransformed data for integration
+# remember to change the max size allowed
+# options(future.globals.maxSize=+Inf)
+data.list <- PrepSCTIntegration(object.list = data.list, anchor.features = features)
+
+# Find Anchors
+anchors <- FindIntegrationAnchors(object.list = data.list, normalization.method = "SCT", anchor.features = features)
+# Perform Integration
+combined.sct <- IntegrateData(anchorset = anchors, normalization.method = "SCT")
+# Change default assay
+DefaultAssay(combined.sct) <- "integrated"
+
+# All subsequent analysis can be done on combined.sct
+combined.sct <- RunPCA(combined.sct, verbose = FALSE) %>% 
+  FindNeighbors(dims = 1:30) %>%
+  RunUMAP(dims = 1:30) %>%
+  FindClusters()
+p1 <- DimPlot(combined.sct, reduction = "umap", group.by = "orig.ident")
+p2 <- DimPlot(combined.sct, reduction = "umap", label = TRUE, repel = TRUE)
+p1 + p2
+```
+
+## PCA, elbowplot, clustering, UMAP
+
+```{r pca, eval=FALSE}
+# Run the following code if reading from existing .rds file
+# Pd <- readRDS(file = "./output/Pd_feature.rds")
+
+Pd <- RunPCA(Pd, features = VariableFeatures(object = Pd), npcs = 50, verbose = FALSE)
+
+# Check first five pcs
+print(Pd[["pca"]], dims = 1:5, nfeatures = 5)
+
+# JackStraw Plot does not work with SCTransform
+# Pd <- JackStraw(Pd, num.replicate = 100)
+# Pd <- ScoreJackStraw(Pd, dims = 1:30)
+# JackStrawPlot(Pd, dims = 1:30)
+
+ElbowPlot(Pd, ndims=50)
+ggsave(file="ElbowPlot.png",path=output.path)
+VizDimLoadings(object = Pd, dims = 1:20, reduction = "pca")
+ggsave(file="PCA1_20.png",path=output.path)
+DimPlot(object=Pd, reduction = "pca")
+ggsave(file="PCADimensionPlot.png",path=output.path)
+#PCAPlot(object=Pd,dims=c(1,2))
+# Heatmap
+DimHeatmap(object = Pd, dims = 1:20, cells = length(Pd$nCount_RNA), balanced = TRUE)
+ggsave(file="PCAHeatMap.png",path=output.path)
+
+Pd <- FindNeighbors(Pd, dims=1:30)
+Pd <- FindClusters(Pd, resolution = 0.2)
+# reticulate::py_install(packages ='umap-learn')
+Pd <- RunUMAP(Pd, dims=1:30, umap.method = 'umap-learn', metric='correlation')
+DimPlot(Pd, reduction="umap",label = TRUE)
+ggsave(file="UMAP_Unlabeled.png",path=output.path)
+
+# Try t-SNE as well, just to check clustering consistency
+#Pd <- RunTSNE(Pd, dims=1:30)
+#DimPlot(Pd, reduction="tsne", label = TRUE)
+#ggsave(file="tsne.png",path="./output/Pd",width = 20,height = 20,units = "cm")
+```
+
+## Markers, Cell Identities
+
+### Find markers for each cluster
+
+```{r marker}
+# Find markers for all clusters
+Pd.markers <- FindAllMarkers(Pd, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+# View markers for all clusters
+Pd.markers %>% group_by(cluster) %>% slice_max(n=5, order_by=avg_log2FC)
+
+# View markers for one cluster
+cluster0.markers <- FindMarkers(Pd, ident.1 = 0, logfc.threshold = 0.25)
+head(cluster0.markers)
+```
+
+### Feature Plot
+
+It's possible to visualize the expression of one or more specific genes in the clusters. We can use this to examine cell type markers or compare the expression of one specific gene across cell types.
+
+Example: PYGO2 It's a tumor-enriched gene, so we should not expect to see much expression in normal prostate.
+
+```{r feature}
+# Violin Plot
+VlnPlot(Pd, features = c("PYGO2"))
+ggsave(file="PYGO2_Violin_Plot.png",path=output.path)
+# Feature plot (as expression in clusters)
+FeaturePlot(samples_all, features = c("PYGO2"))
+ggsave(file="PYGO2_Feature_Plot.png",path=output.path)
+```
+
+### Manual Assignment
+
+#### Cell Type Markers
+
+*Canonical Cell Type Markers from CellMarkerDB*
+
+**Human**
+
+-   **pan-epithelial:** CD326 (EPCAM)
+-   **pan-leukocyte:** CD45 (PTPRC), IL7R, FYN, LYN
+-   **BE:** TP63, PROM1, KRT5, KRT14, AMACR, KRT34, TEAD1, TSC22D1
+-   **LE:** AR, KRT8, KRT18
+-   **OE:** CDH1, CTNNB1
+-   **Stem/Progenitor:** PROM1, CD44, CASP3
+
+**Mouse**
+
+-   **BE:**Cd24, Itga6
+-   **LE:**Cd24, Itga6
+-   **Endothelial:** Pecam1
+-   **Stromal:** Cd34
+-   **Hematopoietic:** Ptprc, Ly76
+-   **Stem/Progenitor:** Alcam, Kit, Cd44, Prom1, (Lin28a, Casp3)
+
+*Cell type markers from Song et al (Human):*
+
+-   **LE:** MSMB, KLK3, ACPP, PLA2G2A, KLK2, DBI, EFNA1, IDH2, FDPS, IL6S
+-   **BE:** DST, ZFP36L2, CAV1, CAV2, CLU, DEFB1, HBEGF, EDN1, F3, FHL2, KRT5, KRT14, KRT15, KRT17, S100A2, STK17A, PHLDA1, RGCC, HSPA14
+-   **Club:** BIK, CEACAM5, CP, CRABP2, CYP1B1, FOXO3, FTH1, GLUL, LCN2, MMP7
+-   **Hillock:** AOC1, ADARB2, ADCY2, ANK1, AOX1, ASCL1, HCN2, CBLB, CLGN, CHN1, CGA
+-   **OE1:** SCGB3A1, LCN2, PIGR, WFDC2, FCGBP
+-   **OE2:** KRT13, APOBEC3A, CSTB, LYPD3, LY6D
+-   **NE:** AQP3, CDKN2B, CSTB, KRT13, IL1RN, TRIM3, LYPD3, TMPRSS4, CLCA4, CCL20
+-   **Fib:** APOD, FBLN1, PTGDS, CFD, DCN, TPM2, RSPO3, FGF2, FBLN2, GSN, GSTM3, CFH, CXCL
+-   **SM:** TPM2, ACTA2, RGS5, MT1A, MYH11, APP, RHOC, ASPH, CRIP2, CD59, CXCL2, HLA-DRB5, CD200, PNP, MSN
+-   **Endo:** IFI27, ACKR1, SELE, VWF
+-   **Leu:** RGS1, C1QA, C1QB, TYROBP, C1QC
+-   **Tumor:** CD74
+
+*Cell type canonical markers from Karthaus et al (mouse):*
+
+-   **Basal Seminal Vesicle (BSV)**: Epcam, Pax2, Krt5, Krt14, Trp63, Calml3
+-   **Luminal Seminal Vesicle (LSV):** Epcam, Pax2, Krt8, Krt18, Pate4
+-   **Ionocyte Seminal Vesicle (ISV):** Epcam, Pax2, Foxi1
+-   **Basal (BE)**: Epcam, Trp63, Krt5, Krt14
+-   **Luminal 1 (LE1)**: Epcam, CD24a, Krt8, Krt18, Nkx3.1, Pbsn
+-   **Luminal 2 (LE2)**: Epcam, CD24a, Krt8, Krt18, Psca, Krt4, Tacst2, Ly6a
+-   **Luminal 3 (LE3/Ionocytes)**: Epcam, CD24a, Krt8, Krt18, Foxi1, Atp6v1g3, Atp6b1b
+-   **Mesenchymal 1 (MC1)**: Col5a2, Lama2, Zeb1, Wnt2, Wnt6, Wnt10a, RorB,
+-   **Mesenchymal 2 (MC2):** Col5a2, Lama2, Zeb1, Rspo1, Fgf10, Sult1e1
+-   **Smooth Muscle (SM):** Acta2, Notch3
+-   **Myofibroblasts (MFB)**: Acta2, MyH11, Rspo3
+-   **Dendritic Cells (DC):** Xcr1
+-   **Endothelial Cells (Endo)**: CD31, Vwf
+-   **Lymphatic Endothelial Cells**: CD31, Prox1
+-   **Glial Cells**: Sox10
+-   **B Cells**: CD19, Ms4a1
+-   **T Cells**: CD3, CD4, CD8
+-   **Macrophages (MF)**: CD14, Aif1
+
+*(Human)*
+
+-   **Basal (BE)**: EPCAM, TRP63, KRT5
+-   **Basal, Hillock (BH)**: EPCAM, TRP63, KRT5, KRT13, KRT4
+-   **Luminal 1, secretory (LE1)**: EPCAM, KLK3, DPP4 (CD26), PLA2G2A
+-   **Luminal 2, club (LE2)**: EPCAM, SCGB1A1, PSCA
+-   **Mesenchymal 1 (MC1)**: COL5A2, FGF10, RSPO3
+-   **Mesenchymal 2 (MC2):** COL5A2, CXCL5
+-   **Smooth Muscle (SM):** ACTA2, MYH11, SRL
+-   **Myofibroblasts (MFB)**: MYH11, IGF1
+-   **Endothelial Cells (Endo)**: CD31 (PECAM1), VWF
+-   **Lymphatic Endothelial Cells**: CD31 (PECAM1), PROX1
+-   **Glial Cells**: SOX10, NTM
+-   **B Cells**: CD19, MS4A1 (CD20)
+-   **T Cells**: CD4, CD8
+-   **Macrophages (MF)**: CD14, AIF1
+-   **NK Cells:** CD16, CD57
+
+```{r assign, eval=FALSE, include=FALSE}
+# Visualize canonical markers 
+DotPlot(d27, features=c("EPCAM", "PTPRC", "TP63", "KRT5", "KRT14", "KRT8", "KRT18", "PECAM1", "MYH11"))
+# Assign cell type to clusters
+d27.cluster.ids <- c("BE", "BE", "SM", "FB", "BE", "FB", "LE", "FB", "BE", "LE", "BE", "LE", "FB", "FB", "BE", "BE", "SM", "BE", "BE", "LE", "BE", "Endo", "Immune")
+# Rename clusters
+names(d27.cluster.ids) <- levels(d27)
+d27<-RenameIdents(d27, d27.cluster.ids)
+# Plot umap with updated cell types
+DimPlot(d27, reduction="umap", label=T)+NoLegend()
+ggsave(file="d27_UMAP_manual.png",path=output.path, width = 30, height=20, units="cm")
+```
+
+### Marker Heatmap
+
+```{r heatmap}
+Pd.markers %>%
+    group_by(cluster) %>%
+    top_n(n = 10, wt = avg_log2FC) -> top10
+DoHeatmap(Pd, features = top10$gene) + NoLegend()
+```
+
+### Automatic Assignment (ScType)
+
+This method comes from [this paper](https://www.nature.com/articles/s41467-022-28803-w) and [code](https://github.com/IanevskiAleksandr/sc-type).
+
+**Requirements**
+
+ScType provided a basic database `ScTypeDB_full.xlsx`. This should be in the same folder as the script file. It contains major cell types in the adrenal, eye, brain, pancreas, liver, etc (but not prostate). It's also possible to use customized database, which we use here. I've included a custom database for prostate `ScTypeDB_prostate.xlsx`, including basal epithelia, luminal epithelia, club epithelia, neuroendocrine epithelia, club epithelia, Hillock epithelia, smooth muscle, fibroblasts, endothelia and leukocytes. The markers are from the top 30 DEGs for each cell type from Henry et al.
+
+For clusters that are unable to be assigned an identity, we may want to go back and look up the cluster markers.
+
+```{r ScType, warning=FALSE}
+# load gene set preparation function
+source("https://raw.githubusercontent.com/IanevskiAleksandr/sc-type/master/R/gene_sets_prepare.R")
+# load cell type annotation function
+source("https://raw.githubusercontent.com/IanevskiAleksandr/sc-type/master/R/sctype_score_.R")
+
+# DB file
+# load custom database
+db_ = "../ScTypeDB_prostate.xlsx";
+tissue = "Prostate" # e.g. Immune system,Pancreas,Liver,Eye,Kidney,Brain,Lung,Adrenal,Heart,Intestine,Muscle,Placenta,Spleen,Stomach,Thymus 
+
+# prepare gene sets
+gs_list = gene_sets_prepare(db_, tissue)
+
+# get cell-type by cell matrix
+es.max = sctype_score(scRNAseqData = Pd[["RNA"]]@scale.data, scaled = TRUE, 
+                      gs = gs_list$gs_positive, gs2 = gs_list$gs_negative) 
+
+# NOTE: scRNAseqData parameter should correspond to your input scRNA-seq matrix. 
+# In case Seurat is used, it is either Pd[["RNA"]]@scale.data (default), Pd[["SCT"]]@scale.data, in case sctransform is used for normalization,
+# or Pd[["integrated"]]@scale.data, in case a joint analysis of multiple single-cell datasets is performed.
+
+# merge by cluster
+cL_results = do.call("rbind", lapply(unique(Pd@meta.data$seurat_clusters), function(cl){
+    es.max.cl = sort(rowSums(es.max[ ,rownames(Pd@meta.data[Pd@meta.data$seurat_clusters==cl, ])]), decreasing = !0)
+    head(data.frame(cluster = cl, type = names(es.max.cl), scores = es.max.cl, ncells = sum(Pd@meta.data$seurat_clusters==cl)), 10)
+}))
+sctype_scores = cL_results %>% group_by(cluster) %>% top_n(n = 1, wt = scores)  
+
+# set low-confident (low ScType score) clusters to "unknown"
+sctype_scores$type[as.numeric(as.character(sctype_scores$scores)) < sctype_scores$ncells/4] = "Unknown"
+print(sctype_scores[,1:3])
+
+# Label plot
+for(j in unique(sctype_scores$cluster)){
+  cl_type = sctype_scores[sctype_scores$cluster==j,]; 
+  Pd@meta.data$cell_types[Pd@meta.data$seurat_clusters == j] = as.character(cl_type$type[1])
+}
+
+DimPlot(Pd, reduction = "umap", label = TRUE, repel = TRUE, group.by = 'cell_types')        
+ggsave(file="ScType_labeled_UMAP.png",path=output.path,width = 30,height = 30,units = "cm")
+```
+
+#### Cluster Annotation Decision Plot (optional)
+
+```{r bubble, warning=FALSE}
+# load libraries
+lapply(c("ggraph","igraph","tidyverse", "data.tree"), library, character.only = T)
+
+# prepare edges
+cL_results=cL_results[order(cL_results$cluster),]; edges = cL_results; edges$type = paste0(edges$type,"_",edges$cluster); edges$cluster = paste0("cluster ", edges$cluster); edges = edges[,c("cluster", "type")]; colnames(edges) = c("from", "to"); rownames(edges) <- NULL
+
+# prepare nodes
+nodes_lvl1 = sctype_scores[,c("cluster", "ncells")]; nodes_lvl1$cluster = paste0("cluster ", nodes_lvl1$cluster); nodes_lvl1$Colour = "#f1f1ef"; nodes_lvl1$ord = 1; nodes_lvl1$realname = nodes_lvl1$cluster; nodes_lvl1 = as.data.frame(nodes_lvl1); nodes_lvl2 = c(); 
+ccolss= c("#5f75ae","#92bbb8","#64a841","#e5486e","#de8e06","#eccf5a","#b5aa0f","#e4b680","#7ba39d","#b15928","#ffff99", "#6a3d9a","#cab2d6","#ff7f00","#fdbf6f","#e31a1c","#fb9a99","#33a02c","#b2df8a","#1f78b4","#a6cee3")
+for (i in 1:length(unique(cL_results$cluster))){
+  dt_tmp = cL_results[cL_results$cluster == unique(cL_results$cluster)[i], ]; nodes_lvl2 = rbind(nodes_lvl2, data.frame(cluster = paste0(dt_tmp$type,"_",dt_tmp$cluster), ncells = dt_tmp$scores, Colour = ccolss[i], ord = 2, realname = dt_tmp$type))
+}
+nodes = rbind(nodes_lvl1, nodes_lvl2); nodes$ncells[nodes$ncells<1] = 1;
+files_db = openxlsx::read.xlsx(db_)[,c("cellName","shortName")]; files_db = unique(files_db); nodes = merge(nodes, files_db, all.x = T, all.y = F, by.x = "realname", by.y = "cellName", sort = F)
+nodes$shortName[is.na(nodes$shortName)] = nodes$realname[is.na(nodes$shortName)]; nodes = nodes[,c("cluster", "ncells", "Colour", "ord", "shortName", "realname")]
+
+mygraph <- graph_from_data_frame(edges, vertices=nodes)
+
+# Make the graph
+gggr<- ggraph(mygraph, layout = 'circlepack', weight=I(ncells)) + 
+  geom_node_circle(aes(filter=ord==1,fill=I("#F5F5F5"), colour=I("#D3D3D3")), alpha=0.9) + geom_node_circle(aes(filter=ord==2,fill=I(Colour), colour=I("#D3D3D3")), alpha=0.9) +
+  theme_void() + geom_node_text(aes(filter=ord==2, label=shortName, colour=I("#ffffff"), fill="white", repel = !1, parse = T, size = I(log(ncells,25)*1.5)))+ geom_node_label(aes(filter=ord==1,  label=shortName, colour=I("#000000"), size = I(3), fill="white", parse = T), repel = !0, segment.linetype="dotted")
+  
+plot1 = DimPlot(Pd, reduction = "umap", label = TRUE, repel = TRUE, cols = ccolss)
+plot1+gggr
+ggsave(file="ClusterAnnotation.png",path=output.path)
+```
+
+## Visualize Cell Type Composition
+
+```{r composition}
+df <- tibble(patient_id=all@meta.data$patient_id, cell_type=all@meta.data$cell_types)
+df2 <- df %>% group_by(patient_id) %>% count(cell_type) %>% mutate(pct=n/sum(n))
+# Stacked bar plot, by patient
+ggplot(df2, aes(fill=cell_type, y=pct, x=patient_id)) + 
+  geom_bar(position="fill", stat="identity")
+```
+
+------------------------------------------------------------------------
+
+# Differential Expression
+
+Traditionally, the recommended assay for DE analysis is the standard RNA. However, in 2022, the [SCTransform](https://satijalab.org/seurat/articles/sctransform_v2_vignette.html) is improved for DE analysis. There are still debates on which assay is the "best" and "standard," and you may get contradictory results from the two assays. (See [this discussion](https://github.com/satijalab/seurat/discussions/4032)). Here will use the newer SCT.
+
+To install the development version of seurat/sct, do the following:
+
+```{r seurat}
+devtools::install_github("satijalab/seurat", ref = "develop")
+object <- SCTransform(object, vst.flavor = "v2")
+# OR:
+devtools::install_github("satijalab/sctransform", ref = "develop")
+```
+
+## ssGSEA with escape
+
+```{r gsea1}
+# install escape from bioconductor
+BiocManager::install(c("escape", "dittoSeq"))
+# load libraries
+suppressPackageStartupMessages(library(escape))
+suppressPackageStartupMessages(library(dittoSeq))
+suppressPackageStartupMessages(library(SingleCellExperiment))
+suppressPackageStartupMessages(library(Seurat))
+suppressPackageStartupMessages(library(SeuratObject))
+
+GS.hallmark <- getGeneSets(library = "H")
+ES.seurat <- enrichIt(obj = normal_human, 
+                      gene.sets = GS.hallmark,
+                      method="UCell",
+                      groups = 1000, cores = 4, 
+                      min.size = 5)
+normal_human <- AddMetaData(normal_human, ES.seurat)
+
+# DotPlot
+#DotPlot(normal_human, features=colnames(ES.seurat), group.by="cell_types") & coord_flip()
+#ggsave("gsea_normal_human.png", path=output.path, width=30, height=30, units = "in")
+# HeatMap
+ssgsea <- tibble(ES.seurat, cell_type=normal_human$cell_types)
+ssgsea <- ssgsea %>% group_by(cell_type) %>%
+  summarize_all(list(name = mean))
+colnames(ssgsea) <- gsub("_name", "", colnames(ssgsea))
+ssgsea <- t(as.matrix(ssgsea[,-1]))
+colnames(ssgsea) <- c("BE", "Club", "Endo", "FB", "Hillock", "Leu", "LE", "SM")
+png(file=paste0(output.path, "normal_gsea_heatmap.png"), width=20, height=15, res=300, units = "in")
+heatmap(ssgsea)
+dev.off()
+
+# BarPlot
+library(tidyr)
+ssgsea_long <- tibble(hallmark=rownames(ssgsea), ssgsea)
+ssgsea_long <- gather(ssgsea_long, cell_type, enrichment_score, BE:SM)
+ssgsea_top5 <- ssgsea_long %>% 
+  group_by(cell_type) %>% 
+  arrange(desc(enrichment_score), .by_group=T) %>% 
+  slice(1:5)
+plot_list <- lapply(unique(ssgsea_top5$cell_type),function(i) ggplot(data=ssgsea_top5[ssgsea_top5$cell_type==i,],aes(x=enrichment_score, y=reorder(hallmark,enrichment_score)))+
+                     geom_bar(stat="identity",fill="lightblue")+
+                     ylab(i)+
+                     xlim(c(0, 0.4))+
+                     xlab("Average Enrichment Score")+
+                     theme_classic())
+plot_list <- align_plots(plot_list[[1]], plot_list[[2]], plot_list[[3]], plot_list[[4]], plot_list[[5]], plot_list[[6]], plot_list[[7]], plot_list[[8]],align="v", axis="tblr")
+plot_grid(plot_list[[1]], plot_list[[2]], plot_list[[3]], plot_list[[4]], plot_list[[5]], plot_list[[6]], plot_list[[7]], plot_list[[8]], nrow=4)
+ggsave("normal_human_top_enriched_pathways.png", path=output.path, width=20, height=12, units="in")
+
+saveRDS(normal_human, paste0(output.path, "normal_human_gsea.rds"))
+```
+
+## GSEA with enrichR, fgsea
+
+To be updated
+
+```{r gsea2}
+require(devtools)
+install_github("YosefLab/VISION")
+library(VISION)
+```
+
+# Cell-Cell Communication with CellChat
+
+```{r cellchat1}
+options(stringsAsFactors = FALSE)
+# Retrieve count matrix from Seurat Object
+data.input <- GetAssayData(cancer_human, assay = "SCT", slot = "data")
+# Retrieve cell type labels
+labels <- cancer_human$cell_types
+# Create meta data
+meta <- data.frame(labels=labels, row.names=colnames(data.input))
+#pd_cc <- createCellChat(pd, group.by = "ident", assay = "RNA")
+# Create cellchat object
+cellchat <- createCellChat(object = data.input, meta = meta, group.by = "labels")
+
+# Specify database to use
+CellChatDB <- CellChatDB.human
+
+# Specify pathways (optional)
+#CellChatDB.use <- subsetDB(CellChatDB, search = "Secreted Signaling")
+#cellchat@DB <- CellChatDB.use
+
+# Use all pathways
+cellchat@DB <- CellChatDB
+
+# Subset to selected pathways
+cellchat <- subsetData(cellchat)
+
+# Speed up computing
+# future::plan("multiprocess", workers = 4)
+
+# Standard workflow
+cellchat <- identifyOverExpressedGenes(cellchat)
+cellchat <- identifyOverExpressedInteractions(cellchat)
+cellchat <- computeCommunProb(cellchat)
+cellchat <- filterCommunication(cellchat, min.cells = 10)
+cellchat <- computeCommunProbPathway(cellchat)
+cellchat <- aggregateNet(cellchat)
+groupSize <- as.numeric(table(cellchat@idents))
+
+# Generate interaction map
+png(file=paste0(output.path, "cancer_interaction_1.png"))
+netVisual_circle(cellchat@net$count, vertex.weight = groupSize, weight.scale = T, label.edge= F, title.name = "Number of interactions")
+dev.off()
+
+png(file=paste0(output.path, "cancer_interaction_2.png"))
+netVisual_circle(cellchat@net$weight, vertex.weight = groupSize, weight.scale = T, label.edge= F, title.name = "Interaction weights/strength")
+dev.off()
+
+# Generate individual maps
+mat <- cellchat@net$weight
+#par(mfrow = c(3,4), xpd=TRUE)
+for (i in 1:nrow(mat)) {
+  mat2 <- matrix(0, nrow = nrow(mat), ncol = ncol(mat), dimnames = dimnames(mat))
+  mat2[i, ] <- mat[i, ]
+  png(file=paste0(output.path, "cancer_interaction_cell_group_",i,".png"))
+  netVisual_circle(mat2, vertex.weight = groupSize, weight.scale = T, edge.weight.max = max(mat), title.name = rownames(mat)[i])
+  dev.off()
+}
+
+
+# Optional
+#pd_cc <- addMeta(pd_cc, meta=meta)
+#pd_cc <- SetIdent(pd_cc, ident.use="labels")
+#levels(cellchat@idents) # show factor levels of the cell labels
+#groupSize <- as.numeric(table(cellchat@idents)) # number of cells in each cell group
+```
+
+## New: seurat v5 fast integration
+```{r}
+# make sure to install seurat v5 first
+#remotes::install_github("satijalab/seurat", "seurat5", quiet = TRUE)
+#devtools::install_github("bnprks/BPCells")
+library(Seurat)
+# BPcells dependency: hdf5 library; install through homebrew
+library(BPCells)
+library(ggplot2)
+library(ggExtra)
+library(cowplot)
+library(dplyr)
+# needs to be set for large dataset analysis
+options(future.globals.maxSize = 1e9)
+options(Seurat.object.assay.version = "v5")
+
+# read data
+d17 <- readRDS("/Volumes/Miana/Cross-species scRNA-seq Analysis/Output/Henry_2018/d17_seurat.rds")
+d27 <- readRDS("/Volumes/Miana/Cross-species scRNA-seq Analysis/Output/Henry_2018/d27_seurat.rds")
+pd <- readRDS("/Volumes/Miana/Cross-species scRNA-seq Analysis/Output/Henry_2018/pd_seurat.rds")
+
+#this.dir = dirname(rstudioapi::getActiveDocumentContext()$path)
+#setwd(this.dir)
+#output.path=paste0(this.dir,"/")
+samples <- list("pd"=pd, "d17"=d17, "d27"=d27)
+sample_names <- c("pd", "d17", "d27")
+# run_qc is in analysis_wrappers.R
+samples <- run_qc(samples, sample_names)
+obj <- merge(samples[['pd']], c(samples[['d17']], samples[['d27']]))
+# require glmGamPoi
+obj <- SCTransform(obj, vars.to.regress = "percent.mt") %>% RunPCA(npcs=30)
+# saved
+
+```
+
+
+# References
+
+## Code References
+
+1.  Seurat-based analysis pipeline are adapted from [Seurat - Guided Clustering Tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html).
+2.  CellChat analysis are adapted from [Inference and analysis of cell-cell communication using CellChat](https://htmlpreview.github.io/?https://github.com/sqjin/CellChat/blob/master/tutorial/CellChat-vignette.html).
+3.  ScType automatic cell-type assignment are based on the instructions on [the ScType GitHub release](https://github.com/IanevskiAleksandr/sc-type).
+4.  Dynamic QC based on [Cell Quality Control by Mattieu Moreau](https://matthieuxmoreau.github.io/EarlyPallialNeurogenesis/html-Reports/Quality_Control.html)
+
+## Literature References
+
+1.  Brady, N. J. *et al.* Temporal evolution of cellular heterogeneity during the progression to advanced AR-negative prostate cancer. *Nat Commun* **12**, 3372 (2021).
+2.  Chen, S. *et al.* Single-cell analysis reveals transcriptomic remodellings in distinct cell types that contribute to human prostate cancer progression. *Nat Cell Biol* **23**, 87--98 (2021).
+3.  Chou, C. *et al.* Programme of self-reactive innate-like T cell-mediated cancer immunity. *Nature* **605**, 139--145 (2022).
+4.  Crowley, L. *et al.* A single-cell atlas of the mouse and human prostate reveals heterogeneity and conservation of epithelial progenitors. *eLife* **9**, e59465 (2020).
+5.  Dong, B. *et al.* Single-cell analysis supports a luminal-neuroendocrine transdifferentiation in human prostate cancer. *Commun Biol* **3**, 1--15 (2020).
+6.  Henry, G. H. *et al.* A Cellular Anatomy of the Normal Adult Human Prostate and Prostatic Urethra. *Cell Reports* **25**, 3530-3542.e5 (2018).
+7.  Joseph, D. B. *et al.* Single-cell analysis of mouse and human prostate reveals novel fibroblasts with specialized distribution and microenvironment interactions. *The Journal of Pathology* **255**, 141--154 (2021).
+8.  Joseph, D. B. *et al.* Urethral luminal epithelia are castration-insensitive cells of the proximal prostate. *The Prostate* **80**, 872--884 (2020).
+9.  Karthaus, W. R. *et al.* Regenerative potential of prostate luminal cells revealed by single-cell analysis. *Science* **368**, 497--505 (2020).
+10. Qiu, X. *et al.* MYC drives aggressive prostate cancer by disrupting transcriptional pause release at androgen receptor targets. *Nat Commun* **13**, 2559 (2022).
+11. Song, H. *et al.* Single-cell analysis of human primary prostate cancer reveals the heterogeneity of tumor-associated epithelial cell states. *Nat Commun* **13**, 141 (2022).
+12. Tuong, Z. K. *et al.* Resolving the immune landscape of human prostate at a single-cell level in health and cancer. *Cell Reports* **37**, 110132 (2021).
+13. Vickman, R. E. *et al.* Heterogeneity of human prostate carcinoma-associated fibroblasts implicates a role for subpopulations in myeloid cell recruitment. *The Prostate* **80**, 173--185 (2020).
+14. Wong, H. Y. *et al.* Single cell analysis of cribriform prostate cancer reveals cell intrinsic and tumor microenvironmental pathways of aggressive disease. *Nat Commun* **13**, 6036 (2022).
+15. Wu, S. Z. *et al.* Cryopreservation of human cancers conserves tumour heterogeneity for single-cell multi-omics analysis. *Genome Medicine* **13**, 81 (2021).
+
+## External Resources
+
+1.  [Seurat Documentation](https://satijalab.org/seurat/index.html)
+2.  [GESA online](https://www.gsea-msigdb.org/gsea/index.jsp)
+3.  [ScType online](http://session.asuscomm.com/)
+4.  [The Protein Atlas](https://www.proteinatlas.org/)
+5.  [Single Cell Portal](https://singlecell.broadinstitute.org/single_cell)
+6.  [CellMarker DB](http://xteam.xbio.top/CellMarker/search.jsp?cellMarkerSpeciesType=Mouse&cellMarker=9530053A07Rik)
+7.  [Azimuth](https://azimuth.hubmapconsortium.org/) (Prostate annotation not currently available)
+8.  [Orchestrating Single-Cell Analysis with Bioconductor](https://bioconductor.org/books/release/OSCA/)
+9.  [BED vignette](https://cran.r-project.org/web/packages/BED/vignettes/BED.html)
