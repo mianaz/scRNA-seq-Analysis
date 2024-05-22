@@ -1,0 +1,140 @@
+---
+title: "Mouse to human mapping"
+author: "Ziyu Zeng"
+date: "2024-05-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Step 0: Setting up
+
+```{r setup}
+library(Seurat)
+# load mouse seurat object (replace with your own)
+mouse_seurat_obj <- readRDS("~/Library/CloudStorage/Box-Box/2024 Yini scRNA/bcell_subset.rds")
+# load human seurat object
+human_seurat_obj <- readRDS("~/Desktop/B/panB_scRNA_processed_data.rds")
+```
+
+## Step 1: Find Homologous Genes
+
+First, you need to identify the homologous genes between mouse and human. The biomaRt package can be helpful for this purpose.
+
+### Option 1: Using biomaRt (currently unavailable)
+
+```{r homolog}
+library(biomaRt)
+
+# Set up the biomaRt connection
+mouse = useMart("ensembl", dataset = "mmusculus_gene_ensembl")
+human = useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+# Get homologous genes (currently unavailable due to server errors)
+homologs <- getLDS(attributes = c("mgi_symbol"), filters = "mgi_symbol", 
+                   values =rownames(mouse_seurat_obj),mart = mouse, attributesL = c("hgnc_symbol"),
+                   martL = human, uniqueRows = TRUE)
+
+# Filter to keep only genes present in both datasets
+mouse_genes <- homologs$MGI.symbol
+human_genes <- homologs$HGNC.symbol
+common_genes <- homologs[homologs$MGI.symbol %in% rownames(mouse_seurat_obj) & homologs$HGNC.symbol %in% rownames(human_seurat_obj), ]
+```
+
+### Option 2: Using Pre-mapped Homologous Gene Lists
+
+MGI Homology Data: <https://www.informatics.jax.org/downloads/reports/HOM_MouseHumanSequence.rpt>
+
+```{r mgi}
+# Load the rpt file
+homologs <- read.delim("~/Downloads/HOM_MouseHumanSequence.rpt", header = TRUE, stringsAsFactors = FALSE)
+
+# Filter for mouse and human rows
+mouse_homologs <- homologs[homologs$Common.Organism.Name == "mouse, laboratory", ]
+human_homologs <- homologs[homologs$Common.Organism.Name == "human", ]
+
+# Make sure they align by DB.Class.Key
+merged_homologs <- merge(mouse_homologs, human_homologs, by = "DB.Class.Key", suffixes = c(".mouse", ".human"))
+
+# Inspect the merged data
+head(merged_homologs)
+
+# Create a data frame of the common genes
+common_genes <- data.frame(MouseGene = merged_homologs$Symbol.mouse, HumanGene = merged_homologs$Symbol.human)
+
+# Filter to keep only genes present in both Seurat objects
+common_genes <- common_genes[common_genes$MouseGene %in% rownames(mouse_seurat_obj) & 
+                             common_genes$HumanGene %in% rownames(human_seurat_obj), ]
+
+# Inspect the common genes
+head(common_genes)
+```
+
+## Step 2. Create a new assay with renamed features
+```{r}
+# Extract the RNA assay matrices (pick one from counts/data, counts are preferred)
+mouse_counts <- mouse_seurat_obj@assays$RNA@counts
+#mouse_data <- mouse_seurat_obj@assays$RNA@data
+
+# Create a named vector for renaming
+rename_vector <- setNames(common_genes$HumanGene, common_genes$MouseGene)
+
+# Ensure that all rownames have corresponding human names
+new_counts_rownames <- rename_vector[rownames(mouse_counts)]
+#new_data_rownames <- rename_vector[rownames(mouse_data)]
+
+# Filter out any NA values (unmapped genes)
+valid_counts <- !is.na(new_counts_rownames)
+#valid_data <- !is.na(new_data_rownames)
+
+mouse_counts <- mouse_counts[valid_counts, ]
+#mouse_data <- mouse_data[valid_data, ]
+
+new_counts_rownames <- new_counts_rownames[valid_counts]
+#new_data_rownames <- new_data_rownames[valid_data]
+
+# Handle non-unique names by making them unique
+new_counts_rownames <- make.unique(new_counts_rownames)
+#new_data_rownames <- make.unique(new_data_rownames)
+
+# Set the rownames
+rownames(mouse_counts) <- new_counts_rownames
+#rownames(mouse_data) <- new_data_rownames
+
+# Create new assays
+counts_assay <- CreateAssayObject(counts = mouse_counts)
+#data_assay <- CreateAssayObject(data = mouse_data)
+
+# Add the new assays to the mouse Seurat object
+mouse_seurat_obj[["RNA_homolog"]] <- counts_assay
+#mouse_seurat_obj[["RNA_homolog"]] <- data_assay
+
+# Set the default assay to the new data assay
+DefaultAssay(mouse_seurat_obj) <- "RNA_homolog"
+
+# Normalize and find variable features for the new assay
+mouse_seurat_obj <- NormalizeData(mouse_seurat_obj)
+mouse_seurat_obj <- FindVariableFeatures(mouse_seurat_obj)
+#mouse_seurat_obj <- ScaleData(mouse_seurat_obj)
+```
+## Step 3: Label Transfer
+
+```{r}
+# normalize/variable features for human obj (optional)
+#human_seurat_obj <- NormalizeData(human_seurat_obj)
+#human_seurat_obj <- FindVariableFeatures(human_seurat_obj)
+
+# Perform anchor transfer
+anchors <- FindTransferAnchors(reference = human_seurat_obj, 
+                               query = mouse_seurat_obj, 
+                               dims = 1:30,
+                               reference.reduction = "pca")
+predictions <- TransferData(anchorset = anchors, refdata = human_seurat_obj$celltype, dims = 1:30) # change to appropriate metadata column in the reference dataset
+mouse_seurat_obj <- AddMetaData(mouse_seurat_obj, metadata = predictions)
+
+# Visualize predictions
+DimPlot(mouse_seurat_obj, reduction = "umap", group.by = c("seurat_clusters", "predicted.id"))
+```
+
